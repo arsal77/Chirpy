@@ -1,5 +1,6 @@
 import express from "express";
 import config from "./config.js";
+import { BadRequest, Unauthorized, Forbidden, NotFound } from "./error.js";
 const app = express();
 const PORT = 8080;
 function middlewareMetricsInc(req, res, next) {
@@ -16,7 +17,7 @@ function metricsHandler(req, res) {
   </body>
 </html>`;
     res.set('Content-Type', 'text/html');
-    res.status(200).send(htmlStr);
+    return res.status(200).send(htmlStr);
 }
 app.use("/admin/metrics", metricsHandler);
 app.post("/admin/reset", (req, res, next) => {
@@ -26,18 +27,18 @@ app.post("/admin/reset", (req, res, next) => {
 app.use("/app", express.static("./src/app"));
 function handlerReadiness(req, res) {
     res.set({ 'Content-Type': 'text/plain', 'charset': 'utf-8' });
-    res.status(200).send('OK');
+    return res.status(200).send('OK');
 }
 app.get("/api/healthz", handlerReadiness);
-app.post("/api/validate_chirp", (req, res) => {
+app.post("/api/validate_chirp", (req, res, next) => {
     const parsedBody = req.body;
     const profane = ["kerfuffle", "sharbert", "fornax"];
     try {
         if (!parsedBody.body) {
-            throw new Error("Invalid JSON");
+            throw new BadRequest("Invalid JSON");
         }
         if (parsedBody.body.length > 140) {
-            throw new Error("Chirp is too long");
+            throw new BadRequest("Chirp is too long. Max length is 140");
         }
         const censuredArray = parsedBody.body.split(" ").map(word => {
             if (profane.includes(word.toLocaleLowerCase())) {
@@ -47,23 +48,10 @@ app.post("/api/validate_chirp", (req, res) => {
         });
         const censuredBody = censuredArray.join(" ");
         const jsonResponse = { cleanedBody: censuredBody };
-        const resBody = JSON.stringify(jsonResponse);
-        res.set("Content-Type", "application/json");
-        return res.status(200).send(resBody);
+        return res.status(200).json(jsonResponse);
     }
     catch (err) {
-        if (err instanceof Error) {
-            const jsonError = { error: err.message };
-            const errorBody = JSON.stringify(jsonError);
-            res.set("Content-Type", "application/json");
-            return res.status(400).send(errorBody);
-        }
-        else {
-            const jsonError = { error: "Unknown Error" };
-            const errorBody = JSON.stringify(jsonError);
-            res.set("Content-Type", "application/json");
-            return res.status(400).send(errorBody);
-        }
+        next(err);
     }
 });
 function middlewareLogResponses(req, res, next) {
@@ -76,6 +64,14 @@ function middlewareLogResponses(req, res, next) {
     next();
 }
 app.use(middlewareLogResponses);
+function errorHandler(err, req, res, next) {
+    console.log(err);
+    if (err instanceof BadRequest || err instanceof Unauthorized || err instanceof Forbidden || err instanceof NotFound) {
+        return res.status(err.errorCode).json({ error: `${err.message}` });
+    }
+    return console.log("500 - Internal Server Errors");
+}
+app.use(errorHandler);
 app.listen(PORT, () => {
     console.log(`Server is running at http://localhost:${PORT}`);
 });
