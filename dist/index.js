@@ -5,6 +5,7 @@ import postgres from "postgres";
 import { migrate } from "drizzle-orm/postgres-js/migrator";
 import { drizzle } from "drizzle-orm/postgres-js";
 import { createUser, deleteUsers } from "./db/queries/users.js";
+import { createChirp, selectChirps, selectChirp } from "./db/queries/chirps.js";
 const migrationClient = postgres(config.db.url, { max: 1 });
 await migrate(drizzle(migrationClient), config.db.migrationConfig);
 const app = express();
@@ -45,30 +46,6 @@ function handlerReadiness(req, res) {
     return res.status(200).send('OK');
 }
 app.get("/api/healthz", handlerReadiness);
-app.post("/api/validate_chirp", (req, res, next) => {
-    const parsedBody = req.body;
-    const profane = ["kerfuffle", "sharbert", "fornax"];
-    try {
-        if (!parsedBody.body) {
-            throw new BadRequest("Invalid JSON");
-        }
-        if (parsedBody.body.length > 140) {
-            throw new BadRequest("Chirp is too long. Max length is 140");
-        }
-        const censuredArray = parsedBody.body.split(" ").map(word => {
-            if (profane.includes(word.toLocaleLowerCase())) {
-                word = '****';
-            }
-            return word;
-        });
-        const censuredBody = censuredArray.join(" ");
-        const jsonResponse = { cleanedBody: censuredBody };
-        return res.status(200).json(jsonResponse);
-    }
-    catch (err) {
-        next(err);
-    }
-});
 app.post("/api/users", async (req, res, next) => {
     try {
         const reqBody = req.body;
@@ -79,7 +56,60 @@ app.post("/api/users", async (req, res, next) => {
             email: req.body.email
         };
         const createdUser = await createUser(newUser);
-        res.status(201).json(createdUser);
+        return res.status(201).json(createdUser);
+    }
+    catch (err) {
+        next(err);
+    }
+});
+app.post("/api/chirps", async (req, res, next) => {
+    const parsedBody = req.body;
+    const profane = ["kerfuffle", "sharbert", "fornax"];
+    try {
+        if (!parsedBody.body) {
+            throw new BadRequest("Invalid JSON. Missing the chirp");
+        }
+        if (!parsedBody.userId) {
+            throw new BadRequest("Invalid JSON. Missing the userId");
+        }
+        if (parsedBody.body.length > 140) {
+            throw new BadRequest("Chirp is too long. Max length is 140");
+        }
+        const censuredArray = parsedBody.body.split(" ").map(word => {
+            if (profane.includes(word.toLocaleLowerCase())) {
+                word = '****';
+            }
+            return word;
+        });
+        const censuredChirp = censuredArray.join(" ");
+        const newChirp = { userId: parsedBody.userId, body: censuredChirp };
+        const insertedChirp = await createChirp(newChirp);
+        return res.status(201).json(insertedChirp);
+    }
+    catch (err) {
+        next(err);
+    }
+});
+app.get("/api/chirps", async (req, res, next) => {
+    try {
+        const allChirps = await selectChirps();
+        return res.status(200).json(allChirps);
+    }
+    catch (err) {
+        next(err);
+    }
+});
+app.get("/api/chirps/:chirpId", async (req, res, next) => {
+    try {
+        let chirpId = req.params.chirpId;
+        if (Array.isArray(chirpId)) {
+            chirpId = chirpId[0];
+        }
+        if (!chirpId) {
+            throw new BadRequest("Request is missing the chirp id");
+        }
+        const chirp = await selectChirp(chirpId);
+        res.status(200).json(chirp);
     }
     catch (err) {
         next(err);
@@ -100,7 +130,8 @@ function errorHandler(err, req, res, next) {
     if (err instanceof BadRequest || err instanceof Unauthorized || err instanceof Forbidden || err instanceof NotFound) {
         return res.status(err.errorCode).json({ error: `${err.message}` });
     }
-    return console.log("500 - Internal Server Errors");
+    console.log(err);
+    return res.end(500);
 }
 app.use(errorHandler);
 app.listen(PORT, () => {

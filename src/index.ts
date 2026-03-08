@@ -5,7 +5,8 @@ import postgres from "postgres";
 import { migrate } from "drizzle-orm/postgres-js/migrator";
 import { drizzle } from "drizzle-orm/postgres-js";
 import { createUser,deleteUsers } from "./db/queries/users.js";
-import { NewUser,SelectUser } from "./db/schema.js";
+import { NewUser,SelectUser,NewChirp,SelectChirp } from "./db/schema.js";
+import { createChirp,selectChirps,selectChirp } from "./db/queries/chirps.js";
 
 
 const migrationClient = postgres(config.db.url, { max: 1 });
@@ -57,38 +58,7 @@ return res.status(200).send('OK') ;
 
 app.get("/api/healthz",handlerReadiness) ;
 
-app.post("/api/validate_chirp",(req:Request,res:Response,next : NextFunction)=>{
 
-    type ValidResponse = {cleanedBody : string} ;
-    type ParsedBody = {body : string}
-    const parsedBody : ParsedBody = req.body ;
-    const profane = ["kerfuffle","sharbert","fornax"] ;
- 
-        try {
-            if(!parsedBody.body) {
-                throw new BadRequest("Invalid JSON") ;
-            }
-
-            if(parsedBody.body.length>140) {
-                throw new BadRequest("Chirp is too long. Max length is 140")
-            }
-
-            const censuredArray = parsedBody.body.split(" ").map(word => {
-                if(profane.includes(word.toLocaleLowerCase())) {
-                 word = '****'
-                }
-                return word ;
-            });
-
-            const censuredBody = censuredArray.join(" ");
-            const jsonResponse : ValidResponse = {cleanedBody : censuredBody} ;
-            return res.status(200).json(jsonResponse);
-            
-        }
-        catch (err) {
-         next(err) ;
-        }
-    })
 
 app.post("/api/users",async (req : Request,res : Response,next:NextFunction)=>{
 try {
@@ -103,14 +73,74 @@ try {
         email : req.body.email 
     }
     const createdUser : SelectUser = await createUser(newUser) ;
-    res.status(201).json(createdUser) ;
+    return res.status(201).json(createdUser) ;
 }
 catch (err) {
     next(err) ;
 }
 })
 
+app.post("/api/chirps",async (req : Request, res : Response, next : NextFunction)=>{
+    type ParsedBody = {body : string, userId : string} ;
+    const parsedBody : ParsedBody = req.body ;
+    const profane = ["kerfuffle","sharbert","fornax"] ;
+ 
+        try {
+            if(!parsedBody.body) {
+                throw new BadRequest("Invalid JSON. Missing the chirp") ;
+            }
+            if(!parsedBody.userId) {
+                throw new BadRequest("Invalid JSON. Missing the userId") ;
+            }
 
+            if(parsedBody.body.length>140) {
+                throw new BadRequest("Chirp is too long. Max length is 140")
+            }
+
+            const censuredArray = parsedBody.body.split(" ").map(word => {
+                if(profane.includes(word.toLocaleLowerCase())) {
+                 word = '****'
+                }
+                return word ;
+            });
+
+            const censuredChirp = censuredArray.join(" ");
+            const newChirp : NewChirp = {userId : parsedBody.userId, body : censuredChirp} ;
+            const insertedChirp : SelectChirp = await createChirp(newChirp) ;
+            return res.status(201).json(insertedChirp);
+            
+        }
+        catch (err) {
+         next(err) ;
+        }
+})
+
+app.get("/api/chirps",async (req : Request,res : Response, next : NextFunction)=>{
+    try {
+    const allChirps = await selectChirps() ;
+    return res.status(200).json(allChirps) ;
+    }
+    catch (err) {
+        next(err) ;
+    }
+})
+
+app.get("/api/chirps/:chirpId",async (req : Request,res : Response,next : NextFunction)=>{
+try {
+    let chirpId = req.params.chirpId ;
+    if(Array.isArray(chirpId)) {
+     chirpId = chirpId[0] ;
+    }
+    if(!chirpId) {
+        throw new BadRequest("Request is missing the chirp id") ;
+    }
+    const chirp : SelectChirp= await selectChirp(chirpId) ;
+    res.status(200).json(chirp) ;
+}
+catch (err) {
+    next(err) ;
+}
+})
 function middlewareLogResponses(req:Request,res:Response,next:NextFunction) {
 res.on("finish",()=>{
     const statusCode = res.statusCode;
@@ -128,7 +158,8 @@ function errorHandler(err : Error,req : Request,res : Response,next : NextFuncti
     if(err instanceof BadRequest || err instanceof Unauthorized || err instanceof Forbidden || err instanceof NotFound){
     return res.status(err.errorCode).json({error: `${err.message}`}) ;
     }
-    return console.log("500 - Internal Server Errors");
+    console.log(err);
+    return res.end(500) ;
 }
 
 app.use(errorHandler) ;

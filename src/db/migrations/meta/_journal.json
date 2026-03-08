@@ -8,6 +8,13 @@
       "when": 1772996296089,
       "tag": "0000_overjoyed_kylun",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1773005431716,
+      "tag": "0001_lean_big_bertha",
+      "breakpoints": true
     }
   ]
 }
