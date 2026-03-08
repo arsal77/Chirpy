@@ -4,7 +4,7 @@ import { BadRequest,Unauthorized,Forbidden,NotFound} from "./error.js";
 import postgres from "postgres";
 import { migrate } from "drizzle-orm/postgres-js/migrator";
 import { drizzle } from "drizzle-orm/postgres-js";
-import { createUser,deleteUsers } from "./db/queries/users.js";
+import { createUser,deleteUsers,lookupUser } from "./db/queries/users.js";
 import { NewUser,SelectUser,NewChirp,SelectChirp } from "./db/schema.js";
 import { createChirp,selectChirps,selectChirp } from "./db/queries/chirps.js";
 
@@ -63,16 +63,18 @@ app.get("/api/healthz",handlerReadiness) ;
 app.post("/api/users",async (req : Request,res : Response,next:NextFunction)=>{
 try {
     type ReqBody = {
-        email : string
+        email : string,
+        password : string
     }
     const reqBody : ReqBody = req.body ;
     if(!reqBody.email) {
         throw new BadRequest("Email is not provided") ;
     }
-    const newUser : NewUser = {
-        email : req.body.email 
+    if(!reqBody.password) {
+        throw new BadRequest("Password is not provided") ;
     }
-    const createdUser : SelectUser = await createUser(newUser) ;
+   
+    const createdUser = await createUser(reqBody.email,reqBody.password) ;
     return res.status(201).json(createdUser) ;
 }
 catch (err) {
@@ -140,6 +142,25 @@ try {
 catch (err) {
     next(err) ;
 }
+})
+
+app.post("/api/login",async (req : Request, res : Response, next : NextFunction)=>{
+    try {
+        type ParsedBody = {email : string, password : string} ;
+        const parsedBody : ParsedBody = req.body ;
+        if(!parsedBody.email) {
+                throw new BadRequest("Invalid JSON. Missing the email") ;
+            }
+        if(!parsedBody.password) {
+                throw new BadRequest("Invalid JSON. Missing the password") ;
+            }
+        const user = await lookupUser(parsedBody.email,parsedBody.password) ;
+        return res.status(200).json(user) ;
+
+    }
+    catch (err) {
+        next(err) ;
+    }
 })
 function middlewareLogResponses(req:Request,res:Response,next:NextFunction) {
 res.on("finish",()=>{

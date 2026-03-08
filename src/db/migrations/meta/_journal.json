@@ -15,6 +15,13 @@
       "when": 1773005431716,
       "tag": "0001_lean_big_bertha",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1773008672864,
+      "tag": "0002_messy_leopardon",
+      "breakpoints": true
     }
   ]
 }
