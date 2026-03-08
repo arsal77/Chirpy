@@ -7,6 +7,7 @@ function middlewareMetricsInc(req, res, next) {
     next();
 }
 app.use("/app", middlewareMetricsInc);
+app.use(express.json());
 function metricsHandler(req, res) {
     const htmlStr = `<html>
   <body>
@@ -29,36 +30,41 @@ function handlerReadiness(req, res) {
 }
 app.get("/api/healthz", handlerReadiness);
 app.post("/api/validate_chirp", (req, res) => {
-    let body = "";
-    req.on("data", (chunk) => {
-        body += chunk;
-    });
-    req.on("end", () => {
-        try {
-            const parsedBody = JSON.parse(body);
-            if (parsedBody.body.length > 140) {
-                throw new Error("Chirp is too long");
+    const parsedBody = req.body;
+    const profane = ["kerfuffle", "sharbert", "fornax"];
+    try {
+        if (!parsedBody.body) {
+            throw new Error("Invalid JSON");
+        }
+        if (parsedBody.body.length > 140) {
+            throw new Error("Chirp is too long");
+        }
+        const censuredArray = parsedBody.body.split(" ").map(word => {
+            if (profane.includes(word.toLocaleLowerCase())) {
+                word = '****';
             }
-            const jsonResponse = { valid: true };
-            const resBody = JSON.stringify(jsonResponse);
+            return word;
+        });
+        const censuredBody = censuredArray.join(" ");
+        const jsonResponse = { cleanedBody: censuredBody };
+        const resBody = JSON.stringify(jsonResponse);
+        res.set("Content-Type", "application/json");
+        return res.status(200).send(resBody);
+    }
+    catch (err) {
+        if (err instanceof Error) {
+            const jsonError = { error: err.message };
+            const errorBody = JSON.stringify(jsonError);
             res.set("Content-Type", "application/json");
-            return res.status(200).send(resBody);
+            return res.status(400).send(errorBody);
         }
-        catch (err) {
-            if (err instanceof Error) {
-                const jsonError = { error: err.message };
-                const errorBody = JSON.stringify(jsonError);
-                res.set("Content-Type", "application/json");
-                return res.status(400).send(errorBody);
-            }
-            else {
-                const jsonError = { error: "Unknown Error" };
-                const errorBody = JSON.stringify(jsonError);
-                res.set("Content-Type", "application/json");
-                return res.status(400).send(errorBody);
-            }
+        else {
+            const jsonError = { error: "Unknown Error" };
+            const errorBody = JSON.stringify(jsonError);
+            res.set("Content-Type", "application/json");
+            return res.status(400).send(errorBody);
         }
-    });
+    }
 });
 function middlewareLogResponses(req, res, next) {
     res.on("finish", () => {

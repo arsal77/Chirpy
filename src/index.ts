@@ -11,6 +11,7 @@ function middlewareMetricsInc(req: Request, res: Response, next: NextFunction) {
 }
 
 app.use("/app",middlewareMetricsInc) ;
+app.use(express.json()) ;
 
 function metricsHandler(req : Request,res : Response){
  const htmlStr= `<html>
@@ -40,22 +41,31 @@ res.status(200).send('OK') ;
 app.get("/api/healthz",handlerReadiness) ;
 
 app.post("/api/validate_chirp",(req:Request,res:Response)=>{
-    let body = ""
-    type ValidResponse = {valid : true} ;
+
+    type ValidResponse = {cleanedBody : string} ;
     type ErrorResponse = {error : string} ;
-    req.on("data",(chunk)=>{
-        body+=chunk ;
-    }) ;
-    req.on("end",()=>{
+    type ParsedBody = {body : string}
+    const parsedBody : ParsedBody = req.body ;
+    const profane = ["kerfuffle","sharbert","fornax"] ;
+ 
         try {
-            type ParsedChirp = {
-            body : string 
-        }
-            const parsedBody : ParsedChirp = JSON.parse(body) ;
+            if(!parsedBody.body) {
+                throw new Error("Invalid JSON") ;
+            }
+
             if(parsedBody.body.length>140) {
                 throw new Error("Chirp is too long")
             }
-            const jsonResponse : ValidResponse = {valid : true} ;
+
+            const censuredArray = parsedBody.body.split(" ").map(word => {
+                if(profane.includes(word.toLocaleLowerCase())) {
+                 word = '****'
+                }
+                return word ;
+            });
+
+            const censuredBody = censuredArray.join(" ");
+            const jsonResponse : ValidResponse = {cleanedBody : censuredBody} ;
             const resBody = JSON.stringify(jsonResponse) ;
             res.set("Content-Type", "application/json");
             return res.status(200).send(resBody);
@@ -76,12 +86,7 @@ app.post("/api/validate_chirp",(req:Request,res:Response)=>{
 
             }
         }
-
-        
-        
-
     })
-})
 
 function middlewareLogResponses(req:Request,res:Response,next:NextFunction) {
 res.on("finish",()=>{
