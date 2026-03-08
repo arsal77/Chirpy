@@ -1,6 +1,12 @@
 import express from "express";
 import config from "./config.js";
 import { BadRequest, Unauthorized, Forbidden, NotFound } from "./error.js";
+import postgres from "postgres";
+import { migrate } from "drizzle-orm/postgres-js/migrator";
+import { drizzle } from "drizzle-orm/postgres-js";
+import { createUser, deleteUsers } from "./db/queries/users.js";
+const migrationClient = postgres(config.db.url, { max: 1 });
+await migrate(drizzle(migrationClient), config.db.migrationConfig);
 const app = express();
 const PORT = 8080;
 function middlewareMetricsInc(req, res, next) {
@@ -20,9 +26,18 @@ function metricsHandler(req, res) {
     return res.status(200).send(htmlStr);
 }
 app.use("/admin/metrics", metricsHandler);
-app.post("/admin/reset", (req, res, next) => {
+app.post("/admin/reset", async (req, res, next) => {
     config.fileserverHits = 0;
-    return res.status(200).end();
+    try {
+        if (!(config.PLATFORM === "dev")) {
+            throw new Forbidden("Forbidden to reset the API");
+        }
+        await deleteUsers();
+        return res.status(200).end();
+    }
+    catch (err) {
+        next(err);
+    }
 });
 app.use("/app", express.static("./src/app"));
 function handlerReadiness(req, res) {
@@ -49,6 +64,22 @@ app.post("/api/validate_chirp", (req, res, next) => {
         const censuredBody = censuredArray.join(" ");
         const jsonResponse = { cleanedBody: censuredBody };
         return res.status(200).json(jsonResponse);
+    }
+    catch (err) {
+        next(err);
+    }
+});
+app.post("/api/users", async (req, res, next) => {
+    try {
+        const reqBody = req.body;
+        if (!reqBody.email) {
+            throw new BadRequest("Email is not provided");
+        }
+        const newUser = {
+            email: req.body.email
+        };
+        const createdUser = await createUser(newUser);
+        res.status(201).json(createdUser);
     }
     catch (err) {
         next(err);
