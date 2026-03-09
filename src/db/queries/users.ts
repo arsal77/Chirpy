@@ -2,7 +2,7 @@ import { Unauthorized } from "../../error.js";
 import { db } from "../index.js";
 import { NewUser, users } from "../schema.js";
 import { eq } from "drizzle-orm";
-import { hashPassword,checkPasswordHash } from "../auth.js";
+import { hashPassword,checkPasswordHash } from "../../auth.js";
 
 export async function createUser(email : string,password : string) : Promise<Omit<NewUser,"hashedPassword">> {
   const hashedPassword = await hashPassword(password) ;
