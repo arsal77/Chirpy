@@ -10,9 +10,11 @@ function envOrThrow(key) {
 }
 const dbURL = envOrThrow('DB_URL');
 const platform = envOrThrow('PLATFORM');
+const secret = envOrThrow('SECRET');
 const config = {
     fileserverHits: 0,
     PLATFORM: platform,
+    secret: secret,
     db: { url: dbURL,
         migrationConfig: migrationConfig
     }

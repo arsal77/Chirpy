@@ -2,7 +2,7 @@ import { Unauthorized } from "../../error.js";
 import { db } from "../index.js";
 import { users } from "../schema.js";
 import { eq } from "drizzle-orm";
-import { hashPassword, checkPasswordHash } from "../auth.js";
+import { hashPassword, checkPasswordHash } from "../../auth.js";
 export async function createUser(email, password) {
     const hashedPassword = await hashPassword(password);
     const user = { email: email, hashedPassword: hashedPassword };
@@ -23,7 +23,8 @@ export async function lookupUser(email, password) {
         if (!verifyPassword) {
             throw new Unauthorized("incorrect email or password");
         }
-        return user;
+        const { hashedPassword, ...safeUser } = user;
+        return safeUser;
     }
     catch (err) {
         throw err;

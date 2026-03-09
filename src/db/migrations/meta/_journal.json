@@ -22,6 +22,21 @@
       "when": 1773008672864,
       "tag": "0002_messy_leopardon",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1773088280760,
+      "tag": "0003_red_doctor_strange",
+      "breakpoints": true
+    },
+
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1773088962057,
+      "tag": "0005_slim_spacker_dave",
+      "breakpoints": true
     }
   ]
 }

@@ -6,6 +6,7 @@ import { migrate } from "drizzle-orm/postgres-js/migrator";
 import { drizzle } from "drizzle-orm/postgres-js";
 import { createUser, deleteUsers, lookupUser } from "./db/queries/users.js";
 import { createChirp, selectChirps, selectChirp } from "./db/queries/chirps.js";
+import { getBearerToken, makeJWT, validateJWT, makeRefreshToken, getAccessTokenFromRefreshToken, revokeRefreshToken } from "./auth.js";
 const migrationClient = postgres(config.db.url, { max: 1 });
 await migrate(drizzle(migrationClient), config.db.migrationConfig);
 const app = express();
@@ -66,11 +67,10 @@ app.post("/api/chirps", async (req, res, next) => {
     const parsedBody = req.body;
     const profane = ["kerfuffle", "sharbert", "fornax"];
     try {
+        const bearerToken = getBearerToken(req);
+        const userId = validateJWT(bearerToken, config.secret);
         if (!parsedBody.body) {
             throw new BadRequest("Invalid JSON. Missing the chirp");
-        }
-        if (!parsedBody.userId) {
-            throw new BadRequest("Invalid JSON. Missing the userId");
         }
         if (parsedBody.body.length > 140) {
             throw new BadRequest("Chirp is too long. Max length is 140");
@@ -82,7 +82,7 @@ app.post("/api/chirps", async (req, res, next) => {
             return word;
         });
         const censuredChirp = censuredArray.join(" ");
-        const newChirp = { userId: parsedBody.userId, body: censuredChirp };
+        const newChirp = { userId: userId, body: censuredChirp };
         const insertedChirp = await createChirp(newChirp);
         return res.status(201).json(insertedChirp);
     }
@@ -125,7 +125,32 @@ app.post("/api/login", async (req, res, next) => {
             throw new BadRequest("Invalid JSON. Missing the password");
         }
         const user = await lookupUser(parsedBody.email, parsedBody.password);
-        return res.status(200).json(user);
+        if (!user.id) {
+            throw new NotFound("User doesn't exist");
+        }
+        const token = makeJWT(user.id, 3600, config.secret);
+        const refreshToken = await makeRefreshToken(user.id);
+        return res.status(200).json({ ...user, token, refreshToken });
+    }
+    catch (err) {
+        next(err);
+    }
+});
+app.use("/api/refresh", async (req, res, next) => {
+    try {
+        const refreshToken = getBearerToken(req);
+        const token = await getAccessTokenFromRefreshToken(refreshToken);
+        return res.status(200).json({ token });
+    }
+    catch (err) {
+        next(err);
+    }
+});
+app.use("/api/revoke", async (req, res, next) => {
+    try {
+        const refreshToken = getBearerToken(req);
+        await revokeRefreshToken(refreshToken);
+        return res.status(204).end();
     }
     catch (err) {
         next(err);

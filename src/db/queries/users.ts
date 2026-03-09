@@ -27,8 +27,10 @@ if(!verifyPassword){
     throw new Unauthorized("incorrect email or password") ;
 }
 
-return user ;
-    }
+const { hashedPassword, ...safeUser } = user;
+
+return safeUser ;
+}
 catch (err) {
     throw err ;
 }

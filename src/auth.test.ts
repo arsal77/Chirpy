@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeAll } from "vitest";
-import { hashPassword,checkPasswordHash,makeJWT, validateJWT } from "./auth.js";
+import { hashPassword,checkPasswordHash,makeJWT, validateJWT,getBearerToken } from "./auth.js";
+import { Request } from "express";
 
 describe("Password Hashing", () => {
   const password1 = "correctPassword123!";
@@ -16,7 +17,7 @@ describe("Password Hashing", () => {
     const result = await checkPasswordHash(password1, hash1);
     expect(result).toBe(true);
   });
-  it("should return fals for the uncorrect password", async () => {
+  it("should return false for the uncorrect password", async () => {
     const result = await checkPasswordHash(password2, hash1);
     expect(result).toBe(false);
   });
@@ -49,7 +50,7 @@ describe("JWT Creation and Validation",()=>{
     it("Should return an invalid token error",()=>{
         const invalidToken = 'invalid_token';
         expect(()=>{
-            validateJWT(invalidTokenoken,secret)
+            validateJWT(invalidToken,secret)
         }).toThrow() ;
     })
 
@@ -61,5 +62,40 @@ describe("JWT Creation and Validation",()=>{
         }).toThrow() ;
     })
   
+})
+
+describe("Extract and Validate bearer token in the request",()=>{
+    const dummyRequest = (bearerToken:string)=> ({
+        get(header:string){
+            if(header === 'authorization') {
+                return 'Bearer ' + bearerToken ;
+            }
+        }
+    } as unknown as Request)
+
+    it("should return the bearer token",()=>{
+     const dummyToken = 'this is a dummy JWT token' 
+      const request = dummyRequest(dummyToken) ;
+      const bearerToken = getBearerToken(request) ;
+      expect(bearerToken).toBe(dummyToken)
+    })
+
+     it("should throw an error for missing the authorization header",()=>{
+        const dummyRequest = (bearerToken:string)=> ({
+        get(header:string){
+            if(header != 'authorization') {
+                return 'Bearer ' + bearerToken ;
+            }
+            else return undefined ;
+        }
+    } as unknown as Request) ;
+
+     const dummyToken = 'this is a dummy JWT token' 
+      const request = dummyRequest(dummyToken) ;
+      expect(()=>{
+        getBearerToken(request) ;}).toThrow() ;
+    })
+    
+    
 })
 

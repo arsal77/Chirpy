@@ -15,6 +15,8 @@ function envOrThrow(key:string ) {
 
 const dbURL = envOrThrow('DB_URL') ;
 const platform = envOrThrow('PLATFORM') ;
+const secret = envOrThrow('SECRET') ;
+
 
 type DBConfig = {
   db : {url : string,
@@ -23,14 +25,16 @@ type DBConfig = {
 
 
 type APIConfig = {
-  fileserverHits: number;
-  PLATFORM : string
+  fileserverHits: number,
+  PLATFORM : string,
+  secret : string
 };
 
 
 const config : APIConfig & DBConfig = {
   fileserverHits : 0,
   PLATFORM : platform,
+  secret : secret,
   db : {url : dbURL,
   migrationConfig : migrationConfig
  } };
