@@ -11,12 +11,14 @@ function envOrThrow(key) {
 const dbURL = envOrThrow('DB_URL');
 const platform = envOrThrow('PLATFORM');
 const secret = envOrThrow('SECRET');
+const polkaKey = envOrThrow('POLKA_KEY');
 const config = {
     fileserverHits: 0,
     PLATFORM: platform,
     secret: secret,
+    polkaKey: polkaKey,
     db: { url: dbURL,
-        migrationConfig: migrationConfig
+        migrationConfig: migrationConfig,
     }
 };
 export default config;

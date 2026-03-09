@@ -16,6 +16,7 @@ function envOrThrow(key:string ) {
 const dbURL = envOrThrow('DB_URL') ;
 const platform = envOrThrow('PLATFORM') ;
 const secret = envOrThrow('SECRET') ;
+const polkaKey = envOrThrow('POLKA_KEY') ;
 
 
 type DBConfig = {
@@ -27,7 +28,8 @@ type DBConfig = {
 type APIConfig = {
   fileserverHits: number,
   PLATFORM : string,
-  secret : string
+  secret : string,
+  polkaKey : string
 };
 
 
@@ -35,8 +37,9 @@ const config : APIConfig & DBConfig = {
   fileserverHits : 0,
   PLATFORM : platform,
   secret : secret,
+  polkaKey : polkaKey,
   db : {url : dbURL,
-  migrationConfig : migrationConfig
+  migrationConfig : migrationConfig,
  } };
 
 export default config ;

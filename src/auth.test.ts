@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll } from "vitest";
-import { hashPassword,checkPasswordHash,makeJWT, validateJWT,getBearerToken } from "./auth.js";
+import { hashPassword,checkPasswordHash,makeJWT, validateJWT,getBearerToken,getAPIKey } from "./auth.js";
 import { Request } from "express";
 
 describe("Password Hashing", () => {
@@ -95,7 +95,41 @@ describe("Extract and Validate bearer token in the request",()=>{
       expect(()=>{
         getBearerToken(request) ;}).toThrow() ;
     })
-    
-    
+
 })
+
+describe("extract validate the Api Key function",()=>{
+    const dummyRequest = (ApiToken:string)=> ({
+        get(header:string){
+            if(header === 'authorization') {
+                return 'ApiKey ' + ApiToken ;
+            }
+        }
+    } as unknown as Request)
+
+    it("should return the Api token",()=>{
+      const dummyToken = 'this is a dummy Api token' 
+      const request = dummyRequest(dummyToken) ;
+      const ApiToken = getAPIKey(request) ;
+      expect(ApiToken).toBe(dummyToken)
+    })
+
+     it("should throw an error for missing the authorization header",()=>{
+        const dummyRequest = (ApiToken:string)=> ({
+        get(header:string){
+            if(header != 'authorization') {
+                return 'ApiKey ' + ApiToken ;
+            }
+            else return undefined ;
+        }
+    } as unknown as Request) ;
+
+     const dummyToken = 'this is a dummy Api token' 
+      const request = dummyRequest(dummyToken) ;
+      expect(()=>{
+        getAPIKey(request) ;}).toThrow() ;
+    })
+
+})
+
 

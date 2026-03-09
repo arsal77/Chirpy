@@ -1,6 +1,6 @@
 import argon2 from "argon2";
 import jwt from "jsonwebtoken";
-import { BadRequest, Unauthorized } from "./error.js";
+import { NotFound, Unauthorized } from "./error.js";
 import { randomBytes } from "node:crypto";
 import { db } from "./db/index.js";
 import { refresh_tokens } from "./db/schema.js";
@@ -44,7 +44,7 @@ export function validateJWT(tokenString, secret) {
 export function getBearerToken(req) {
     const bearerToken = req.get('authorization')?.replace('Bearer ', '');
     if (!bearerToken) {
-        throw new BadRequest("Authorization header is not present");
+        throw new Unauthorized("Authorization header is not present");
     }
     return bearerToken;
 }
@@ -82,10 +82,17 @@ export async function revokeRefreshToken(tokenId) {
         const currDate = new Date();
         const [revokedToken] = await db.update(refresh_tokens).set({ revokedAt: currDate }).where(eq(refresh_tokens.token, tokenId)).returning();
         if (!revokedToken) {
-            throw new BadRequest("The token is not found");
+            throw new NotFound("The token is not found");
         }
     }
     catch (err) {
         throw err;
     }
+}
+export function getAPIKey(req) {
+    const bearerToken = req.get('authorization')?.replace('ApiKey ', '');
+    if (!bearerToken) {
+        throw new Unauthorized("Authorization header is not present");
+    }
+    return bearerToken;
 }

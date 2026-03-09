@@ -2,11 +2,11 @@
 import argon2  from "argon2";
 import jwt from "jsonwebtoken";
 import type { JwtPayload } from "jsonwebtoken";
-import { BadRequest, NotFound, Unauthorized } from "./error.js";
+import {  NotFound, Unauthorized } from "./error.js";
 import { Request } from "express";
 import { randomBytes } from "node:crypto";
 import { db } from "./db/index.js";
-import { refresh_tokens,NewRefreshToken } from "./db/schema.js";
+import { refresh_tokens,NewRefreshToken} from "./db/schema.js";
 import { eq } from "drizzle-orm";
 import config from "./config.js";
 
@@ -56,7 +56,7 @@ catch (err) {
 export function getBearerToken(req: Request): string {
     const bearerToken = req.get('authorization')?.replace('Bearer ','')
     if(!bearerToken) {
-        throw new BadRequest("Authorization header is not present") ;
+        throw new Unauthorized("Authorization header is not present") ;
     }
     return bearerToken ;
 }
@@ -105,3 +105,12 @@ catch (err) {
     throw err ;
 }
 }
+
+export function getAPIKey(req: Request): string {
+    const bearerToken = req.get('authorization')?.replace('ApiKey ','')
+    if(!bearerToken) {
+        throw new Unauthorized("Authorization header is not present") ;
+    }
+    return bearerToken ;
+}
+

@@ -4,9 +4,9 @@ import { BadRequest, Unauthorized, Forbidden, NotFound } from "./error.js";
 import postgres from "postgres";
 import { migrate } from "drizzle-orm/postgres-js/migrator";
 import { drizzle } from "drizzle-orm/postgres-js";
-import { createUser, deleteUsers, lookupUser } from "./db/queries/users.js";
-import { createChirp, selectChirps, selectChirp } from "./db/queries/chirps.js";
-import { getBearerToken, makeJWT, validateJWT, makeRefreshToken, getAccessTokenFromRefreshToken, revokeRefreshToken } from "./auth.js";
+import { createUser, deleteUsers, lookupUser, updateUserDetails, updateUserToChirpyRed } from "./db/queries/users.js";
+import { createChirp, selectChirps, selectChirp, deleteChirpWithValidation } from "./db/queries/chirps.js";
+import { getBearerToken, makeJWT, validateJWT, makeRefreshToken, getAccessTokenFromRefreshToken, revokeRefreshToken, hashPassword, getAPIKey } from "./auth.js";
 const migrationClient = postgres(config.db.url, { max: 1 });
 await migrate(drizzle(migrationClient), config.db.migrationConfig);
 const app = express();
@@ -63,6 +63,22 @@ app.post("/api/users", async (req, res, next) => {
         next(err);
     }
 });
+app.put("/api/users", async (req, res, next) => {
+    try {
+        const parsedBody = req.body;
+        if (!parsedBody.email || !parsedBody.password) {
+            throw new BadRequest("email or password is not provided");
+        }
+        const token = getBearerToken(req);
+        const userId = validateJWT(token, config.secret);
+        const hashedPassword = await hashPassword(parsedBody.password);
+        const updatedUser = await updateUserDetails(userId, parsedBody.email, hashedPassword);
+        return res.status(200).json(updatedUser);
+    }
+    catch (err) {
+        next(err);
+    }
+});
 app.post("/api/chirps", async (req, res, next) => {
     const parsedBody = req.body;
     const profane = ["kerfuffle", "sharbert", "fornax"];
@@ -92,7 +108,17 @@ app.post("/api/chirps", async (req, res, next) => {
 });
 app.get("/api/chirps", async (req, res, next) => {
     try {
-        const allChirps = await selectChirps();
+        let authorId = "";
+        let authorIdQuery = req.query.authorId;
+        if (typeof authorIdQuery === "string") {
+            authorId = authorIdQuery;
+        }
+        let sort = "asc";
+        let sortQuery = req.query.sort;
+        if (sortQuery === "desc") {
+            sort = sortQuery;
+        }
+        const allChirps = await selectChirps(authorId, sort);
         return res.status(200).json(allChirps);
     }
     catch (err) {
@@ -150,6 +176,41 @@ app.use("/api/revoke", async (req, res, next) => {
     try {
         const refreshToken = getBearerToken(req);
         await revokeRefreshToken(refreshToken);
+        return res.status(204).end();
+    }
+    catch (err) {
+        next(err);
+    }
+});
+app.delete("/api/chirps/:chirpid", async (req, res, next) => {
+    try {
+        let chirpId = req.params.chirpid;
+        if (Array.isArray(chirpId)) {
+            chirpId = chirpId[0];
+        }
+        const token = getBearerToken(req);
+        const user = validateJWT(token, config.secret);
+        await deleteChirpWithValidation(chirpId, user);
+        return res.status(204).end();
+    }
+    catch (err) {
+        next(err);
+    }
+});
+app.post("/api/polka/webhooks", async (req, res, next) => {
+    try {
+        const parsedBody = req.body;
+        const apiKey = getAPIKey(req);
+        if (apiKey !== config.polkaKey) {
+            throw new Unauthorized("Not authorized");
+        }
+        if (parsedBody.event !== "user.upgraded") {
+            return res.status(204).end();
+        }
+        if (!parsedBody.data.userId) {
+            throw new BadRequest("user ID not provided");
+        }
+        await updateUserToChirpyRed(parsedBody.data.userId);
         return res.status(204).end();
     }
     catch (err) {

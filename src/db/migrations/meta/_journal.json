@@ -30,12 +30,18 @@
       "tag": "0003_red_doctor_strange",
       "breakpoints": true
     },
-
     {
       "idx": 5,
       "version": "7",
       "when": 1773088962057,
       "tag": "0005_slim_spacker_dave",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1773094914063,
+      "tag": "0006_mushy_the_stranger",
       "breakpoints": true
     }
   ]
